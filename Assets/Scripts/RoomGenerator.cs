@@ -21,8 +21,8 @@ public class RoomGenerator : MonoBehaviour
     // =========================================================
 
     [Header("Room Size")]
-    [SerializeField] private float roomWidth = 16f;
-    [SerializeField] private float roomHeight = 9f;
+    [SerializeField] private float roomWidth = 24f;
+    [SerializeField] private float roomHeight = 16f;
 
 
     // =========================================================
@@ -34,17 +34,62 @@ public class RoomGenerator : MonoBehaviour
     [SerializeField] private float maxPlatformWidth = 4f;
     [SerializeField] private float platformHeight = 0.5f;
 
+    // Espaço extra usado para evitar plataformas grudadas.
+    [SerializeField] private float platformSafetyMargin = 0.35f;
+
 
     // =========================================================
-    // LIMITES DO PULO
+    // CAMINHO
     // =========================================================
 
-    [Header("Player Jump Limits")]
-    [SerializeField] private float minGap = 0.5f;
-    [SerializeField] private float maxGap = 1.5f;
+    [Header("Path Generation")]
+    [SerializeField] private int minPathLength = 8;
+    [SerializeField] private int maxPathLength = 12;
 
-    [SerializeField] private float maxJumpUp = 1f;
-    [SerializeField] private float maxJumpDown = 1.5f;
+    // Quantas posições diferentes tentaremos antes
+    // de usar uma solução de emergência.
+    [SerializeField] private int attemptsPerPlatform = 30;
+
+
+    // =========================================================
+    // MOVIMENTO HORIZONTAL
+    // =========================================================
+
+    [Header("Horizontal Movement")]
+    [SerializeField] private float minHorizontalGap = 0.8f;
+    [SerializeField] private float maxHorizontalGap = 2.2f;
+
+
+    // =========================================================
+    // MOVIMENTO VERTICAL
+    // =========================================================
+
+    [Header("Vertical Movement")]
+    [SerializeField] private float minVerticalStep = 1.0f;
+    [SerializeField] private float maxVerticalStep = 1.8f;
+
+    // Quando subimos/descemos, também podemos deslocar
+    // um pouco horizontalmente.
+    [SerializeField] private float minVerticalHorizontalShift = 0.8f;
+    [SerializeField] private float maxVerticalHorizontalShift = 2.2f;
+
+
+    // =========================================================
+    // DIREÇÕES
+    // =========================================================
+
+    [Header("Direction Chances")]
+    [Range(0f, 100f)]
+    [SerializeField] private float rightChance = 45f;
+
+    [Range(0f, 100f)]
+    [SerializeField] private float upChance = 30f;
+
+    [Range(0f, 100f)]
+    [SerializeField] private float downChance = 20f;
+
+    [Range(0f, 100f)]
+    [SerializeField] private float leftChance = 5f;
 
 
     // =========================================================
@@ -56,15 +101,35 @@ public class RoomGenerator : MonoBehaviour
 
 
     // =========================================================
-    // GERAÇÃO
+    // PORTA
     // =========================================================
 
-    [Header("Generation")]
-    [SerializeField] private int maxAttempts = 20;
+    [Header("Exit Door")]
+    [SerializeField] private float doorHeight = 1.5f;
 
+
+    // =========================================================
+    // DADOS INTERNOS
+    // =========================================================
 
     private List<GameObject> generatedPlatforms =
         new List<GameObject>();
+
+    private GameObject startPlatform;
+    private GameObject endPlatform;
+
+
+    // =========================================================
+    // DIREÇÕES
+    // =========================================================
+
+    private enum PathDirection
+    {
+        Right,
+        Up,
+        Down,
+        Left
+    }
 
 
     // =========================================================
@@ -89,15 +154,17 @@ public class RoomGenerator : MonoBehaviour
 
     private IEnumerator RegenerateRoutine()
     {
-        // Primeiro apagamos a sala atual
         ClearRoom();
 
-        // Esperamos um frame para o Unity
-        // terminar os Destroy()
+        // Espera os objetos antigos realmente serem destruídos.
         yield return null;
 
-        // Geramos uma nova sala
         GenerateRoom();
+
+        // Espera a física atualizar.
+        yield return new WaitForFixedUpdate();
+
+        Physics2D.SyncTransforms();
     }
 
 
@@ -107,8 +174,11 @@ public class RoomGenerator : MonoBehaviour
 
     private void ClearRoom()
     {
-        // Apaga todas as plataformas
-        // que estão dentro de Platforms
+        if (platformsParent == null)
+        {
+            return;
+        }
+
         for (int i = platformsParent.childCount - 1; i >= 0; i--)
         {
             Destroy(
@@ -117,6 +187,9 @@ public class RoomGenerator : MonoBehaviour
         }
 
         generatedPlatforms.Clear();
+
+        startPlatform = null;
+        endPlatform = null;
     }
 
 
@@ -128,103 +201,138 @@ public class RoomGenerator : MonoBehaviour
     {
         generatedPlatforms.Clear();
 
-        // Reseta a porta para poder ser usada novamente
+        if (platformPrefab == null)
+        {
+            Debug.LogError(
+                "Platform Prefab não foi configurado."
+            );
+
+            return;
+        }
+
+        if (platformsParent == null)
+        {
+            Debug.LogError(
+                "Platforms Parent não foi configurado."
+            );
+
+            return;
+        }
+
         if (roomExit != null)
         {
             roomExit.ResetExit();
         }
 
-        GenerateMainPath();
+        GenerateGuaranteedPath();
+
+        SpawnPlayer();
     }
 
 
     // =========================================================
-    // GERAR CAMINHO PRINCIPAL
+    // GERAR CAMINHO GARANTIDO
     // =========================================================
 
-    private void GenerateMainPath()
+    private void GenerateGuaranteedPath()
     {
-        float leftLimit = -roomWidth / 2f;
-        float rightLimit = roomWidth / 2f;
+        float leftLimit =
+            -roomWidth / 2f;
 
-        float bottomLimit = -roomHeight / 2f;
-        float topLimit = roomHeight / 2f;
+        float rightLimit =
+            roomWidth / 2f;
+
+        float bottomLimit =
+            -roomHeight / 2f;
+
+        float topLimit =
+            roomHeight / 2f;
 
 
         // =====================================================
-        // START PLATFORM
+        // PLATAFORMA INICIAL
         // =====================================================
 
-        float currentWidth = 2.5f;
+        float startWidth = 3f;
 
-        float currentX =
-            leftLimit + currentWidth / 2f;
+        float startX =
+            leftLimit
+            + startWidth / 2f
+            + 1f;
 
-        float currentY =
-            bottomLimit + 0.5f;
+        float startY =
+            bottomLimit + 2f;
 
 
-        GameObject startPlatform =
+        startPlatform =
             CreatePlatform(
-                currentX,
-                currentY,
-                currentWidth,
+                startX,
+                startY,
+                startWidth,
                 "StartPlatform"
             );
 
-        generatedPlatforms.Add(startPlatform);
 
-
-        // =====================================================
-        // SPAWN DO PLAYER
-        // =====================================================
-
-        SpawnPlayer(
-            currentX,
-            currentY
+        generatedPlatforms.Add(
+            startPlatform
         );
 
 
+        // Plataforma atual.
+        Vector2 currentPosition =
+            new Vector2(
+                startX,
+                startY
+            );
+
+        float currentWidth =
+            startWidth;
+
+
+        int pathLength =
+            Random.Range(
+                minPathLength,
+                maxPathLength + 1
+            );
+
+
+        PathDirection previousDirection =
+            PathDirection.Right;
+
+
         // =====================================================
-        // CAMINHO
+        // CRIAR CAMINHO
         // =====================================================
 
-        int platformNumber = 0;
-
-
-        while (true)
+        for (
+            int i = 0;
+            i < pathLength;
+            i++
+        )
         {
-            float currentRightEdge =
-                currentX + currentWidth / 2f;
-
-
-            float remainingDistance =
-                rightLimit - currentRightEdge;
-
-
-            // Estamos próximos do final da sala
-            if (remainingDistance <= 4f)
-            {
-                break;
-            }
-
-
-            bool platformCreated = false;
+            bool created = false;
 
 
             // =================================================
-            // TENTATIVAS
+            // TENTAR POSIÇÕES ALEATÓRIAS
             // =================================================
 
             for (
                 int attempt = 0;
-                attempt < maxAttempts;
+                attempt < attemptsPerPlatform;
                 attempt++
             )
             {
-                // ---------------------------------------------
-                // LARGURA
-                // ---------------------------------------------
+                PathDirection direction =
+                    ChooseDirection(
+                        currentPosition,
+                        previousDirection,
+                        leftLimit,
+                        rightLimit,
+                        bottomLimit,
+                        topLimit
+                    );
+
 
                 float nextWidth =
                     Random.Range(
@@ -233,80 +341,27 @@ public class RoomGenerator : MonoBehaviour
                     );
 
 
-                // ---------------------------------------------
-                // GAP
-                // ---------------------------------------------
-
-                float gap =
-                    Random.Range(
-                        minGap,
-                        maxGap
-                    );
-
-
-                // ---------------------------------------------
-                // X
-                // ---------------------------------------------
-
-                float nextX =
-                    currentRightEdge
-                    + gap
-                    + nextWidth / 2f;
-
-
-                // Não deixa passar da sala
-                if (
-                    nextX + nextWidth / 2f
-                    >= rightLimit - 1f
-                )
-                {
-                    continue;
-                }
-
-
-                // ---------------------------------------------
-                // Y
-                // ---------------------------------------------
-
-                float verticalChange =
-                    Random.Range(
-                        -maxJumpDown,
-                        maxJumpUp
-                    );
-
-
-                float nextY =
-                    currentY + verticalChange;
-
-
-                float minY =
-                    bottomLimit + 0.5f;
-
-
-                float maxY =
-                    topLimit - 1f;
-
-
-                nextY =
-                    Mathf.Clamp(
-                        nextY,
-                        minY,
-                        maxY
-                    );
-
-
-                // ---------------------------------------------
-                // VERIFICAR PULO
-                // ---------------------------------------------
-
-                if (
-                    !CanReachPlatform(
-                        currentX,
-                        currentY,
+                Vector2 nextPosition =
+                    CalculateNextPosition(
+                        currentPosition,
                         currentWidth,
-                        nextX,
-                        nextY,
-                        nextWidth
+                        nextWidth,
+                        direction
+                    );
+
+
+                // =============================================
+                // LIMITES DA SALA
+                // =============================================
+
+                if (
+                    !IsInsideRoom(
+                        nextPosition,
+                        nextWidth,
+                        leftLimit,
+                        rightLimit,
+                        bottomLimit,
+                        topLimit
                     )
                 )
                 {
@@ -314,14 +369,13 @@ public class RoomGenerator : MonoBehaviour
                 }
 
 
-                // ---------------------------------------------
-                // VERIFICAR SOBREPOSIÇÃO
-                // ---------------------------------------------
+                // =============================================
+                // COLISÃO
+                // =============================================
 
                 if (
                     IsOverlapping(
-                        nextX,
-                        nextY,
+                        nextPosition,
                         nextWidth
                     )
                 )
@@ -330,168 +384,434 @@ public class RoomGenerator : MonoBehaviour
                 }
 
 
-                // ---------------------------------------------
+                // =============================================
                 // CRIAR
-                // ---------------------------------------------
+                // =============================================
 
                 GameObject platform =
                     CreatePlatform(
-                        nextX,
-                        nextY,
+                        nextPosition.x,
+                        nextPosition.y,
                         nextWidth,
-                        "PathPlatform_" + platformNumber
+                        "PathPlatform_" + i
                     );
 
 
-                generatedPlatforms.Add(platform);
+                generatedPlatforms.Add(
+                    platform
+                );
 
 
-                // Agora essa passa a ser
-                // a plataforma atual
-                currentX = nextX;
-                currentY = nextY;
-                currentWidth = nextWidth;
+                currentPosition =
+                    nextPosition;
 
+                currentWidth =
+                    nextWidth;
 
-                platformNumber++;
+                previousDirection =
+                    direction;
 
-                platformCreated = true;
+                created = true;
 
                 break;
             }
 
 
-            // Não encontrou nenhuma posição válida
-            if (!platformCreated)
-            {
-                Debug.LogWarning(
-                    "Não foi possível continuar o caminho."
-                );
+            // =================================================
+            // FALLBACK
+            // =================================================
+            //
+            // Se nenhuma posição aleatória funcionar,
+            // tentamos criar uma plataforma segura à direita.
+            // =================================================
 
-                break;
+            if (!created)
+            {
+                bool fallbackCreated =
+                    TryCreateFallbackPlatform(
+                        ref currentPosition,
+                        ref currentWidth,
+                        i,
+                        leftLimit,
+                        rightLimit,
+                        bottomLimit,
+                        topLimit
+                    );
+
+
+                if (!fallbackCreated)
+                {
+                    Debug.Log(
+                        "Caminho terminou antes do limite em: "
+                        + i
+                    );
+
+                    break;
+                }
+
+
+                previousDirection =
+                    PathDirection.Right;
             }
         }
 
 
         // =====================================================
-        // FINAL DA SALA
+        // A ÚLTIMA PLATAFORMA VIRA A PLATAFORMA FINAL
         // =====================================================
 
-        CreateEndPlatform(
-            currentX,
-            currentY,
+        CreateExitPlatform(
+            currentPosition,
             currentWidth,
-            rightLimit
+            leftLimit,
+            rightLimit,
+            bottomLimit,
+            topLimit
         );
     }
 
 
     // =========================================================
-    // SPAWN PLAYER
+    // ESCOLHER DIREÇÃO
     // =========================================================
 
-    private void SpawnPlayer(
-        float platformX,
-        float platformY
+    private PathDirection ChooseDirection(
+        Vector2 currentPosition,
+        PathDirection previousDirection,
+        float leftLimit,
+        float rightLimit,
+        float bottomLimit,
+        float topLimit
     )
     {
-        if (player == null)
-        {
-            Debug.LogError(
-                "Player não foi configurado!"
-            );
+        float adjustedRight =
+            rightChance;
 
-            return;
+        float adjustedUp =
+            upChance;
+
+        float adjustedDown =
+            downChance;
+
+        float adjustedLeft =
+            leftChance;
+
+
+        // =====================================================
+        // EVITAR BORDAS
+        // =====================================================
+
+        float horizontalMargin = 4f;
+        float verticalMargin = 3f;
+
+
+        if (
+            currentPosition.x
+            > rightLimit - horizontalMargin
+        )
+        {
+            adjustedRight *= 0.15f;
+
+            adjustedLeft += 20f;
+            adjustedUp += 15f;
+            adjustedDown += 15f;
         }
 
 
-        Vector3 spawnPosition =
-            transform.TransformPoint(
-                new Vector3(
-                    platformX,
-                    platformY + playerSpawnHeight,
-                    0f
-                )
+        if (
+            currentPosition.x
+            < leftLimit + horizontalMargin
+        )
+        {
+            adjustedLeft *= 0.1f;
+
+            adjustedRight += 30f;
+        }
+
+
+        if (
+            currentPosition.y
+            > topLimit - verticalMargin
+        )
+        {
+            adjustedUp = 0f;
+
+            adjustedDown += 30f;
+        }
+
+
+        if (
+            currentPosition.y
+            < bottomLimit + verticalMargin
+        )
+        {
+            adjustedDown = 0f;
+
+            adjustedUp += 30f;
+        }
+
+
+        // =====================================================
+        // EVITAR ZIG-ZAG VERTICAL EXAGERADO
+        // =====================================================
+
+        if (
+            previousDirection
+            == PathDirection.Up
+        )
+        {
+            adjustedDown *= 0.25f;
+        }
+
+
+        if (
+            previousDirection
+            == PathDirection.Down
+        )
+        {
+            adjustedUp *= 0.25f;
+        }
+
+
+        // =====================================================
+        // ESCOLHA
+        // =====================================================
+
+        float total =
+            adjustedRight
+            + adjustedUp
+            + adjustedDown
+            + adjustedLeft;
+
+
+        if (total <= 0f)
+        {
+            return PathDirection.Right;
+        }
+
+
+        float roll =
+            Random.Range(
+                0f,
+                total
             );
 
 
-        spawnPosition.z =
-            player.position.z;
-
-
-        player.position =
-            spawnPosition;
-
-
-        Rigidbody2D rb =
-            player.GetComponent<Rigidbody2D>();
-
-
-        if (rb != null)
+        if (roll < adjustedRight)
         {
-            // Para qualquer movimento anterior
-            rb.linearVelocity = Vector2.zero;
-
-            // Só impede o Player de girar.
-            // NÃO trava X ou Y.
-            rb.constraints =
-                RigidbodyConstraints2D.FreezeRotation;
+            return PathDirection.Right;
         }
+
+
+        roll -= adjustedRight;
+
+
+        if (roll < adjustedUp)
+        {
+            return PathDirection.Up;
+        }
+
+
+        roll -= adjustedUp;
+
+
+        if (roll < adjustedDown)
+        {
+            return PathDirection.Down;
+        }
+
+
+        return PathDirection.Left;
     }
 
 
     // =========================================================
-    // VERIFICAR SE CONSEGUE PULAR
+    // CALCULAR PRÓXIMA POSIÇÃO
     // =========================================================
 
-    private bool CanReachPlatform(
-        float currentX,
-        float currentY,
+    private Vector2 CalculateNextPosition(
+        Vector2 currentPosition,
         float currentWidth,
-        float nextX,
-        float nextY,
-        float nextWidth
+        float nextWidth,
+        PathDirection direction
     )
     {
-        float currentRight =
-            currentX
-            + currentWidth / 2f;
-
-
-        float nextLeft =
-            nextX
-            - nextWidth / 2f;
-
-
         float horizontalGap =
-            nextLeft
-            - currentRight;
+            Random.Range(
+                minHorizontalGap,
+                maxHorizontalGap
+            );
 
 
-        float verticalDifference =
-            nextY
-            - currentY;
+        float verticalStep =
+            Random.Range(
+                minVerticalStep,
+                maxVerticalStep
+            );
 
 
-        if (horizontalGap > maxGap)
+        float verticalHorizontalShift =
+            Random.Range(
+                minVerticalHorizontalShift,
+                maxVerticalHorizontalShift
+            );
+
+
+        Vector2 nextPosition =
+            currentPosition;
+
+
+        switch (direction)
+        {
+            // =================================================
+            // DIREITA
+            // =================================================
+
+            case PathDirection.Right:
+
+                nextPosition.x +=
+                    currentWidth / 2f
+                    + horizontalGap
+                    + nextWidth / 2f;
+
+                // Pequena variação de altura.
+                nextPosition.y +=
+                    Random.Range(
+                        -0.35f,
+                        0.35f
+                    );
+
+                break;
+
+
+            // =================================================
+            // ESQUERDA
+            // =================================================
+
+            case PathDirection.Left:
+
+                nextPosition.x -=
+                    currentWidth / 2f
+                    + horizontalGap
+                    + nextWidth / 2f;
+
+                nextPosition.y +=
+                    Random.Range(
+                        -0.35f,
+                        0.35f
+                    );
+
+                break;
+
+
+            // =================================================
+            // CIMA
+            // =================================================
+
+            case PathDirection.Up:
+
+                nextPosition.y +=
+                    verticalStep;
+
+                nextPosition.x +=
+                    Random.Range(
+                        -verticalHorizontalShift,
+                        verticalHorizontalShift
+                    );
+
+                break;
+
+
+            // =================================================
+            // BAIXO
+            // =================================================
+
+            case PathDirection.Down:
+
+                nextPosition.y -=
+                    verticalStep;
+
+                nextPosition.x +=
+                    Random.Range(
+                        -verticalHorizontalShift,
+                        verticalHorizontalShift
+                    );
+
+                break;
+        }
+
+
+        return nextPosition;
+    }
+
+
+    // =========================================================
+    // VERIFICAR LIMITES
+    // =========================================================
+
+    private bool IsInsideRoom(
+        Vector2 position,
+        float width,
+        float leftLimit,
+        float rightLimit,
+        float bottomLimit,
+        float topLimit
+    )
+    {
+        float halfWidth =
+            width / 2f;
+
+
+        float left =
+            position.x - halfWidth;
+
+        float right =
+            position.x + halfWidth;
+
+
+        float bottom =
+            position.y
+            - platformHeight / 2f;
+
+        float top =
+            position.y
+            + platformHeight / 2f;
+
+
+        float wallMargin = 0.5f;
+
+
+        if (
+            left
+            < leftLimit + wallMargin
+        )
         {
             return false;
         }
 
 
-        if (horizontalGap < minGap)
+        if (
+            right
+            > rightLimit - wallMargin
+        )
         {
             return false;
         }
 
 
-        if (verticalDifference > maxJumpUp)
+        if (
+            bottom
+            < bottomLimit + wallMargin
+        )
         {
             return false;
         }
 
 
-        if (verticalDifference < -maxJumpDown)
+        if (
+            top
+            > topLimit - wallMargin
+        )
         {
             return false;
         }
@@ -506,8 +826,7 @@ public class RoomGenerator : MonoBehaviour
     // =========================================================
 
     private bool IsOverlapping(
-        float x,
-        float y,
+        Vector2 position,
         float width
     )
     {
@@ -516,12 +835,14 @@ public class RoomGenerator : MonoBehaviour
             in generatedPlatforms
         )
         {
-            float otherX =
-                platform.transform.localPosition.x;
+            if (platform == null)
+            {
+                continue;
+            }
 
 
-            float otherY =
-                platform.transform.localPosition.y;
+            Vector2 otherPosition =
+                platform.transform.localPosition;
 
 
             float otherWidth =
@@ -530,27 +851,37 @@ public class RoomGenerator : MonoBehaviour
 
             float horizontalDistance =
                 Mathf.Abs(
-                    x - otherX
+                    position.x
+                    - otherPosition.x
                 );
 
 
             float verticalDistance =
                 Mathf.Abs(
-                    y - otherY
+                    position.y
+                    - otherPosition.y
                 );
 
 
-            float minimumHorizontalDistance =
+            float requiredHorizontalDistance =
                 width / 2f
-                + otherWidth / 2f;
+                + otherWidth / 2f
+                + platformSafetyMargin;
 
 
+            float requiredVerticalDistance =
+                platformHeight
+                + platformSafetyMargin;
+
+
+            // Os retângulos estão ocupando
+            // praticamente a mesma região.
             if (
                 horizontalDistance
-                    < minimumHorizontalDistance
+                    < requiredHorizontalDistance
                 &&
                 verticalDistance
-                    < platformHeight
+                    < requiredVerticalDistance
             )
             {
                 return true;
@@ -563,131 +894,227 @@ public class RoomGenerator : MonoBehaviour
 
 
     // =========================================================
-    // CRIAR PLATAFORMA FINAL
+    // FALLBACK
     // =========================================================
 
-    private void CreateEndPlatform(
-        float currentX,
-        float currentY,
-        float currentWidth,
-        float rightLimit
+    private bool TryCreateFallbackPlatform(
+        ref Vector2 currentPosition,
+        ref float currentWidth,
+        int index,
+        float leftLimit,
+        float rightLimit,
+        float bottomLimit,
+        float topLimit
     )
     {
-        float endWidth = 2.5f;
-
-
-        float currentRight =
-            currentX
-            + currentWidth / 2f;
-
-
-        float endX =
-            rightLimit
-            - endWidth / 2f;
-
-
-        float endLeft =
-            endX
-            - endWidth / 2f;
-
-
-        float gap =
-            endLeft
-            - currentRight;
-
-
-        // =====================================================
-        // CONSEGUE IR DIRETO PARA O FINAL
-        // =====================================================
-
-        if (
-            gap >= minGap
-            &&
-            gap <= maxGap
-        )
-        {
-            GameObject end =
-                CreatePlatform(
-                    endX,
-                    currentY,
-                    endWidth,
-                    "EndPlatform"
-                );
-
-
-            generatedPlatforms.Add(end);
-
-
-            PositionExitDoor(
-                endX,
-                currentY
+        float nextWidth =
+            Mathf.Lerp(
+                minPlatformWidth,
+                maxPlatformWidth,
+                0.5f
             );
 
 
+        // Primeiro tentamos direita.
+        Vector2 nextPosition =
+            currentPosition;
+
+
+        nextPosition.x +=
+            currentWidth / 2f
+            + minHorizontalGap
+            + nextWidth / 2f;
+
+
+        if (
+            IsInsideRoom(
+                nextPosition,
+                nextWidth,
+                leftLimit,
+                rightLimit,
+                bottomLimit,
+                topLimit
+            )
+            &&
+            !IsOverlapping(
+                nextPosition,
+                nextWidth
+            )
+        )
+        {
+            GameObject platform =
+                CreatePlatform(
+                    nextPosition.x,
+                    nextPosition.y,
+                    nextWidth,
+                    "FallbackPlatform_" + index
+                );
+
+
+            generatedPlatforms.Add(
+                platform
+            );
+
+
+            currentPosition =
+                nextPosition;
+
+            currentWidth =
+                nextWidth;
+
+
+            return true;
+        }
+
+
+        // =====================================================
+        // TENTAR SUBIR
+        // =====================================================
+
+        nextPosition =
+            currentPosition
+            + new Vector2(
+                0f,
+                minVerticalStep
+            );
+
+
+        if (
+            IsInsideRoom(
+                nextPosition,
+                nextWidth,
+                leftLimit,
+                rightLimit,
+                bottomLimit,
+                topLimit
+            )
+            &&
+            !IsOverlapping(
+                nextPosition,
+                nextWidth
+            )
+        )
+        {
+            GameObject platform =
+                CreatePlatform(
+                    nextPosition.x,
+                    nextPosition.y,
+                    nextWidth,
+                    "FallbackPlatform_" + index
+                );
+
+
+            generatedPlatforms.Add(
+                platform
+            );
+
+
+            currentPosition =
+                nextPosition;
+
+            currentWidth =
+                nextWidth;
+
+
+            return true;
+        }
+
+
+        // =====================================================
+        // TENTAR DESCER
+        // =====================================================
+
+        nextPosition =
+            currentPosition
+            + new Vector2(
+                0f,
+                -minVerticalStep
+            );
+
+
+        if (
+            IsInsideRoom(
+                nextPosition,
+                nextWidth,
+                leftLimit,
+                rightLimit,
+                bottomLimit,
+                topLimit
+            )
+            &&
+            !IsOverlapping(
+                nextPosition,
+                nextWidth
+            )
+        )
+        {
+            GameObject platform =
+                CreatePlatform(
+                    nextPosition.x,
+                    nextPosition.y,
+                    nextWidth,
+                    "FallbackPlatform_" + index
+                );
+
+
+            generatedPlatforms.Add(
+                platform
+            );
+
+
+            currentPosition =
+                nextPosition;
+
+            currentWidth =
+                nextWidth;
+
+
+            return true;
+        }
+
+
+        return false;
+    }
+
+
+    // =========================================================
+    // CRIAR PLATAFORMA DA SAÍDA
+    // =========================================================
+
+    private void CreateExitPlatform(
+        Vector2 currentPosition,
+        float currentWidth,
+        float leftLimit,
+        float rightLimit,
+        float bottomLimit,
+        float topLimit
+    )
+    {
+        // A própria última plataforma pode
+        // funcionar como plataforma final.
+        if (generatedPlatforms.Count == 0)
+        {
             return;
         }
 
 
-        // =====================================================
-        // CRIAR PONTE INTERMEDIÁRIA
-        // =====================================================
-
-        float middleWidth = 2f;
-
-
-        float middleGap =
-            Mathf.Clamp(
-                gap / 2f,
-                minGap,
-                maxGap * 0.8f
-            );
+        endPlatform =
+            generatedPlatforms[
+                generatedPlatforms.Count - 1
+            ];
 
 
-        float middleX =
-            currentRight
-            + middleGap
-            + middleWidth / 2f;
+        endPlatform.name =
+            "EndPlatform";
 
 
-        if (
-            middleX + middleWidth / 2f
-            < endLeft
-        )
-        {
-            GameObject middle =
-                CreatePlatform(
-                    middleX,
-                    currentY,
-                    middleWidth,
-                    "FinalBridge"
-                );
-
-
-            generatedPlatforms.Add(middle);
-        }
-
-
-        // =====================================================
-        // END PLATFORM
-        // =====================================================
-
-        GameObject finalPlatform =
-            CreatePlatform(
-                endX,
-                currentY,
-                endWidth,
-                "EndPlatform"
-            );
-
-
-        generatedPlatforms.Add(
-            finalPlatform
-        );
+        Vector2 endPosition =
+            endPlatform.transform.localPosition;
 
 
         PositionExitDoor(
-            endX,
-            currentY
+            endPosition.x,
+            endPosition.y
         );
     }
 
@@ -711,17 +1138,96 @@ public class RoomGenerator : MonoBehaviour
         }
 
 
-        float doorHeight = 1.5f;
-
-
         exitDoor.localPosition =
             new Vector3(
                 platformX,
                 platformY
                     + platformHeight / 2f
                     + doorHeight / 2f,
-                0f
+                exitDoor.localPosition.z
             );
+    }
+
+
+    // =========================================================
+    // SPAWN DO PLAYER
+    // =========================================================
+
+    private void SpawnPlayer()
+    {
+        if (player == null)
+        {
+            Debug.LogWarning(
+                "Player não foi configurado."
+            );
+
+            return;
+        }
+
+
+        if (startPlatform == null)
+        {
+            Debug.LogError(
+                "StartPlatform não existe."
+            );
+
+            return;
+        }
+
+
+        Vector3 platformWorldPosition =
+            startPlatform.transform.position;
+
+
+        float platformTop =
+            platformWorldPosition.y
+            + platformHeight / 2f;
+
+
+        Vector3 spawnPosition =
+            new Vector3(
+                platformWorldPosition.x,
+                platformTop
+                    + playerSpawnHeight,
+                player.position.z
+            );
+
+
+        // =====================================================
+        // ZERAR FÍSICA
+        // =====================================================
+
+        Rigidbody2D rb =
+            player.GetComponent<Rigidbody2D>();
+
+
+        if (rb != null)
+        {
+            rb.linearVelocity =
+                Vector2.zero;
+
+            rb.angularVelocity =
+                0f;
+
+            rb.position =
+                new Vector2(
+                    spawnPosition.x,
+                    spawnPosition.y
+                );
+        }
+
+
+        player.position =
+            spawnPosition;
+
+
+        Physics2D.SyncTransforms();
+
+
+        Debug.Log(
+            "PLAYER SPAWNADO EM: "
+            + spawnPosition
+        );
     }
 
 

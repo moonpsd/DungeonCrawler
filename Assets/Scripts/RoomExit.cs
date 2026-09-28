@@ -1,11 +1,14 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 
+
 public class RoomExit : MonoBehaviour
 {
     // =========================================================
     // UI
     // =========================================================
+
+    [SerializeField] private RoomTeleport roomTeleport;
 
     [Header("UI")]
     [SerializeField] private GameObject interactionText;
@@ -173,31 +176,34 @@ public class RoomExit : MonoBehaviour
     private void CompleteRoom()
     {
         completed = true;
-
         playerNearby = false;
-
 
         if (interactionText != null)
         {
             interactionText.SetActive(false);
         }
 
+        Debug.Log("Sala concluída!");
 
-        Debug.Log(
-            "Sala concluída!"
-        );
-
-
-        // Avisa o DungeonManager
+        // Primeiro gera a próxima sala
         if (DungeonManager.Instance != null)
         {
             DungeonManager.Instance.NextRoom();
         }
         else
         {
-            Debug.LogError(
-                "DungeonManager não encontrado!"
-            );
+            Debug.LogError("DungeonManager não encontrado!");
+            return;
+        }
+
+        // Depois manda teleportar
+        if (roomTeleport != null)
+        {
+            roomTeleport.TeleportPlayer();
+        }
+        else
+        {
+            Debug.LogError("RoomTeleport não configurado!");
         }
     }
 

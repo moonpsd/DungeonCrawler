@@ -25,7 +25,7 @@ Transform:
   m_GameObject: {fileID: 566160911809604049}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: -4.5, y: -2.8, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -116,17 +116,27 @@ MonoBehaviour:
   player: {fileID: 5912965017341522096, guid: c14cb8f46e09b624098f549038e48a55, type: 3}
   exitDoor: {fileID: 465836250885715832}
   roomExit: {fileID: 3099826217967954610}
-  roomWidth: 16
-  roomHeight: 9
+  roomWidth: 28
+  roomHeight: 26
   minPlatformWidth: 2
   maxPlatformWidth: 4
   platformHeight: 0.5
-  minGap: 0.5
-  maxGap: 1.5
-  maxJumpUp: 1
-  maxJumpDown: 1.5
-  playerSpawnHeight: 1.2
-  maxAttempts: 20
+  platformSafetyMargin: 0.35
+  minPathLength: 10
+  maxPathLength: 15
+  attemptsPerPlatform: 30
+  minHorizontalGap: 0.9
+  maxHorizontalGap: 1.8
+  minVerticalStep: 2.2
+  maxVerticalStep: 2.2
+  minVerticalHorizontalShift: 0.8
+  maxVerticalHorizontalShift: 2.2
+  rightChance: 45
+  upChance: 30
+  downChance: 20
+  leftChance: 5
+  playerSpawnHeight: 0.65
+  doorHeight: 1.5
 --- !u!1 &2029821040367851392
 GameObject:
   m_ObjectHideFlags: 0
@@ -170,6 +180,7 @@ GameObject:
   - component: {fileID: 2697165280905691617}
   - component: {fileID: 8199374194441733475}
   - component: {fileID: 3099826217967954610}
+  - component: {fileID: 4895765381529308607}
   m_Layer: 0
   m_Name: ExitDoor
   m_TagString: Untagged
@@ -310,8 +321,23 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7d00efb2291e21a4b849e0045ef83893, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RoomExit
+  roomTeleport: {fileID: 4895765381529308607}
   interactionText: {fileID: 0}
   textOffset: {x: 0, y: 1.5, z: 0}
+--- !u!114 &4895765381529308607
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2500846427885225417}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c2f2a298dee495145b09a75810855eab, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RoomTeleport
+  player: {fileID: 5912965017341522096, guid: c14cb8f46e09b624098f549038e48a55, type: 3}
+  playerSpawn: {fileID: 3199167780107491775}
 --- !u!1 &6481520435716268439
 GameObject:
   m_ObjectHideFlags: 0
