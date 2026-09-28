@@ -2,20 +2,28 @@ using UnityEngine;
 
 public class CameraFollow : MonoBehaviour
 {
+    [Header("Target")]
     [SerializeField] private Transform player;
+
+    [Header("Follow")]
     [SerializeField] private float smoothSpeed = 5f;
 
-    private Vector3 offset;
+    [Header("Offset")]
+    [SerializeField] private Vector3 offset = new Vector3(0f, 1f, -10f);
 
-    void Start()
+    private void LateUpdate()
     {
-        offset = transform.position - player.position;
-    }
+        if (player == null)
+            return;
 
-    void LateUpdate()
-    {
-        Vector3 targetPosition = player.position + offset;
+        Vector3 targetPosition =
+            player.position + offset;
 
-        transform.position = Vector3.Lerp(transform.position, targetPosition, smoothSpeed * Time.deltaTime);
+        transform.position =
+            Vector3.Lerp(
+                transform.position,
+                targetPosition,
+                smoothSpeed * Time.deltaTime
+            );
     }
 }
