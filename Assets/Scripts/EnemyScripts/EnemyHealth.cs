@@ -1,11 +1,8 @@
 using UnityEngine;
-using UnityEngine.InputSystem;
-using UnityEngine.UI;
 
-public class PlayerHealth : MonoBehaviour
+public class EnemyHealth : MonoBehaviour
 {
     [SerializeField] private float maxHealth = 100f;
-    [SerializeField] private Slider healthSlider;
 
     private float currentHealth;
 
@@ -24,7 +21,6 @@ public class PlayerHealth : MonoBehaviour
         }
 
         Debug.Log("Health: " + currentHealth);
-        UpdateHealthBar();
 
         if (currentHealth <= 0)
         {
@@ -42,16 +38,12 @@ public class PlayerHealth : MonoBehaviour
         }
 
         Debug.Log("Health: " + currentHealth);
-        UpdateHealthBar();
-    }
-
-    private void UpdateHealthBar()
-    {
-        healthSlider.value = currentHealth / maxHealth;
     }
 
     private void Die()
     {
-        Debug.Log("Player died!");
+        Debug.Log("Enemy died!");
+
+        Destroy(gameObject);
     }
 }

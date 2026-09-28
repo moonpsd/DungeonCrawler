@@ -3,26 +3,33 @@ using UnityEngine.InputSystem;
 
 public class PlayerMovement : MonoBehaviour
 {
-    // Movement variables
+    // Movement parameters
     [SerializeField] private float speed = 5f;
     [SerializeField] private float jumpForce = 5f;
-    private float direction = 0f;
-    private Rigidbody2D rb;
 
-    // Ground check variables
+    // Ground check parameters
     [SerializeField] private Transform groundCheck;
     [SerializeField] private float groundCheckRadius = 0.2f;
     [SerializeField] private LayerMask groundLayer;
 
+    // References
+
+    [SerializeField] private SpriteRenderer spriteRenderer;
+    [SerializeField] private Transform attackPoint;
+
+    private float direction;
+    private Rigidbody2D rb;
     private bool isGrounded;
 
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
+    private float attackPointOriginalX;
+
     void Start()
     {
         rb = GetComponent<Rigidbody2D>();
+
+        attackPointOriginalX = Mathf.Abs(attackPoint.localPosition.x);
     }
 
-    // Update is called once per frame
     void Update()
     {
         isGrounded = Physics2D.OverlapCircle(
@@ -36,22 +43,58 @@ public class PlayerMovement : MonoBehaviour
         if (Keyboard.current.aKey.isPressed)
         {
             direction = -1f;
+
+            FlipLeft();
         }
 
         if (Keyboard.current.dKey.isPressed)
         {
             direction = 1f;
+
+            FlipRight();
         }
 
         if (Keyboard.current.spaceKey.wasPressedThisFrame && isGrounded)
         {
-            rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpForce);
+            rb.linearVelocity = new Vector2(
+                rb.linearVelocity.x,
+                jumpForce
+            );
         }
     }
 
     void FixedUpdate()
     {
-        rb.linearVelocity = new Vector2(direction * speed, rb.linearVelocity.y);
+        rb.linearVelocity = new Vector2(
+            direction * speed,
+            rb.linearVelocity.y
+        );
+    }
+
+    private void FlipLeft()
+    {
+        // Vira somente o sprite
+        spriteRenderer.flipX = true;
+
+        // Move o AttackPoint para esquerda
+        Vector3 attackPosition = attackPoint.localPosition;
+
+        attackPosition.x = -attackPointOriginalX;
+
+        attackPoint.localPosition = attackPosition;
+    }
+
+    private void FlipRight()
+    {
+        // Sprite normal
+        spriteRenderer.flipX = false;
+
+        // Move o AttackPoint para direita
+        Vector3 attackPosition = attackPoint.localPosition;
+
+        attackPosition.x = attackPointOriginalX;
+
+        attackPoint.localPosition = attackPosition;
     }
 
     private void OnDrawGizmosSelected()
