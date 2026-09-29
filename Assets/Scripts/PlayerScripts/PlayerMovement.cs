@@ -3,6 +3,8 @@ using UnityEngine.InputSystem;
 
 public class PlayerMovement : MonoBehaviour
 {
+    private PlayerEffects effects;
+
     // Movement parameters
     [SerializeField] private float speed = 5f;
     [SerializeField] private float jumpForce = 5f;
@@ -27,7 +29,7 @@ public class PlayerMovement : MonoBehaviour
     {
         rb = GetComponent<Rigidbody2D>();
 
-        attackPointOriginalX = Mathf.Abs(attackPoint.localPosition.x);
+        effects = GetComponent<PlayerEffects>();
     }
 
     void Update()
@@ -65,6 +67,10 @@ public class PlayerMovement : MonoBehaviour
 
     void FixedUpdate()
     {
+        if (effects.IsKnockback)
+        {
+            return;
+        }
         rb.linearVelocity = new Vector2(
             direction * speed,
             rb.linearVelocity.y

@@ -3,6 +3,8 @@ using UnityEngine.InputSystem;
 
 public class PlayerAttack : MonoBehaviour
 {
+    private PlayerEffects effects;
+
     //attack damage, range and cooldown
     [SerializeField] private float attackDamage = 20f;
     [SerializeField] private Vector2 attackRange = new Vector2(0.8f, 0.4f);
@@ -14,11 +16,21 @@ public class PlayerAttack : MonoBehaviour
 
     private float nextAttackTime = 0f;
 
+    void Start()
+    {
+        effects = GetComponent<PlayerEffects>();
+    }
+
     void Update()
     {
         if (Mouse.current.leftButton.wasPressedThisFrame &&
             Time.time >= nextAttackTime)
         {
+            if (effects.IsKnockback)
+            {
+                return;
+            }
+
             Attack();
 
             nextAttackTime = Time.time + attackCooldown;
@@ -41,6 +53,23 @@ public class PlayerAttack : MonoBehaviour
             if (enemyHealth != null)
             {
                 enemyHealth.TakeDamage(attackDamage);
+            }
+
+            //parte responsável por empurrar o player para trás quando ele é atingido
+            EnemyEffects effects = enemy.GetComponent<EnemyEffects>();
+
+            if (effects != null)
+            {
+                float direction = Mathf.Sign(
+                    enemy.transform.position.x - transform.position.x
+                );
+
+                Vector2 knockbackForce = new Vector2(
+                    direction * 5f,
+                    2.5f
+                );
+
+                effects.ApplyKnockback(knockbackForce, 0.5f);
             }
 
             Debug.Log("Atingiu: " + enemy.name);

@@ -2,6 +2,8 @@ using UnityEngine;
 
 public class EnemyAI : MonoBehaviour
 {
+    private EnemyEffects effects;
+
     // Movement speed of the enemy
     [SerializeField] private float moveSpeed = 2f;
 
@@ -17,8 +19,8 @@ public class EnemyAI : MonoBehaviour
 
     // Attack properties
     [SerializeField] private float attackDamage = 30f;
-    [SerializeField] private float attackCooldown = 1f;
-    private Vector2 attackRangeHitbox = new Vector2(1.2f, 0.5f);
+    [SerializeField] private float attackCooldown = 2f;
+    private Vector2 attackRangeHitbox = new Vector2(1.5f, 0.5f);
 
     [SerializeField] private Transform attackPoint;
     [SerializeField] private SpriteRenderer spriteRenderer;
@@ -33,6 +35,7 @@ public class EnemyAI : MonoBehaviour
     {
         rb = GetComponent<Rigidbody2D>();
         attackPointOriginalX = Mathf.Abs(attackPoint.localPosition.x);
+        effects = GetComponent<EnemyEffects>();
     }
 
     void FixedUpdate()
@@ -52,6 +55,10 @@ public class EnemyAI : MonoBehaviour
 
         if (distanceToPlayer <= attackRange)
         {
+            if (effects.IsKnockback)
+            {
+                return;
+            }
             StopMoving();
 
             if (Time.time >= nextAttackTime)
@@ -64,6 +71,10 @@ public class EnemyAI : MonoBehaviour
 
         else
         {
+            if (effects.IsKnockback)
+            {
+                return;
+            }
             ChasePlayer();
         }
     }
@@ -187,6 +198,23 @@ public class EnemyAI : MonoBehaviour
             if (playerHealth != null)
             {
                 playerHealth.TakeDamage(attackDamage);
+            }
+
+            //parte responsável por empurrar o player para trás quando ele é atingido
+            PlayerEffects effects = player.GetComponent<PlayerEffects>();
+
+            if (effects != null)
+            {
+                float direction = Mathf.Sign(
+                    player.transform.position.x - transform.position.x
+                );
+
+                Vector2 knockbackForce = new Vector2(
+                  direction * 5f,
+                  2.5f
+                );
+
+                effects.ApplyKnockback(knockbackForce, 0.5f);
             }
 
             Debug.Log("Atingiu: " + player.name);
