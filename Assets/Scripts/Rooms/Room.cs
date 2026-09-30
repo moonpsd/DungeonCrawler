@@ -152,14 +152,7 @@ public class Room : MonoBehaviour
 
 
             door.Disconnect();
-
             door.SetActive(shouldBeOpen);
-
-
-            if (shouldBeOpen)
-            {
-                door.Connect();
-            }
         }
     }
 

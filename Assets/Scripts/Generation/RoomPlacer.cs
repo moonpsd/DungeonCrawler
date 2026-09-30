@@ -6,6 +6,7 @@ public class RoomPlacer : MonoBehaviour
     [Header("References")]
     [SerializeField] private MapGenerator mapGenerator;
     [SerializeField] private RoomPrefabDatabase prefabDatabase;
+    [SerializeField] private CorridorPlacer corridorPlacer;
 
 
     [Header("Room Placement")]
@@ -121,6 +122,25 @@ public class RoomPlacer : MonoBehaviour
         Debug.Log(
             $"RoomPlacer: {roomsByNodeID.Count} nodes registrados."
         );
+
+        Debug.Log(
+            $"RoomPlacer: {spawnedRooms.Count} salas instanciadas."
+        );
+
+        Debug.Log(
+            $"RoomPlacer: {roomsByNodeID.Count} nodes registrados."
+        );
+
+        if (corridorPlacer != null)
+        {
+            corridorPlacer.PlaceCorridors();
+        }
+        else
+        {
+            Debug.LogWarning(
+                "RoomPlacer: CorridorPlacer não foi atribuído."
+            );
+        }
     }
 
 

@@ -534,6 +534,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RoomDoor
   direction: 1
   isConnected: 0
+  connectedDoor: {fileID: 0}
 --- !u!1 &3915039621969937785
 GameObject:
   m_ObjectHideFlags: 0
@@ -580,6 +581,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RoomDoor
   direction: 2
   isConnected: 0
+  connectedDoor: {fileID: 0}
 --- !u!1 &4108490102025452854
 GameObject:
   m_ObjectHideFlags: 0
@@ -1071,6 +1073,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RoomDoor
   direction: 3
   isConnected: 0
+  connectedDoor: {fileID: 0}
 --- !u!1 &7378470654818292444
 GameObject:
   m_ObjectHideFlags: 0
@@ -1380,3 +1383,4 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RoomDoor
   direction: 0
   isConnected: 0
+  connectedDoor: {fileID: 0}
