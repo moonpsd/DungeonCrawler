@@ -1,7 +1,8 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using Unity.Netcode;
 
-public class PlayerAttack : MonoBehaviour
+public class PlayerAttack : NetworkBehaviour
 {
     private PlayerEffects effects;
 
@@ -23,6 +24,9 @@ public class PlayerAttack : MonoBehaviour
 
     void Update()
     {
+        if (!IsOwner)
+            return;
+
         if (Mouse.current.leftButton.wasPressedThisFrame &&
             Time.time >= nextAttackTime)
         {
@@ -31,14 +35,23 @@ public class PlayerAttack : MonoBehaviour
                 return;
             }
 
-            Attack();
+            RequestAttackRpc();
 
             nextAttackTime = Time.time + attackCooldown;
         }
     }
 
+    [Rpc(SendTo.Server)]
+    private void RequestAttackRpc()
+    {
+        Attack();
+    }
+
     private void Attack()
     {
+        if (!IsServer)
+            return;
+
         Collider2D[] enemiesHit = Physics2D.OverlapBoxAll(
             attackPoint.position,
             attackRange,

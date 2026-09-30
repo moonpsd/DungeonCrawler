@@ -1,22 +1,38 @@
 using System.Collections;
 using UnityEngine;
+using Unity.Netcode;
 
-public class PlayerEffects : MonoBehaviour
+public class PlayerEffects : NetworkBehaviour
 {
     private Rigidbody2D rb;
 
     // Estados
     public bool IsKnockback { get; private set; }
 
-    private void Start()
+    private Coroutine knockbackCoroutine;
+
+    private void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
     }
 
     public void ApplyKnockback(Vector2 force, float duration)
     {
-        StopCoroutine(nameof(KnockbackCoroutine));
-        StartCoroutine(KnockbackCoroutine(force, duration));
+        if (!IsServer)
+            return;
+
+        ApplyKnockbackRpc(force, duration);
+    }
+
+    [Rpc(SendTo.Owner)]
+    private void ApplyKnockbackRpc(Vector2 force, float duration)
+    {
+        if (knockbackCoroutine != null)
+        {
+            StopCoroutine(knockbackCoroutine);
+        }
+
+        knockbackCoroutine = StartCoroutine(KnockbackCoroutine(force, duration));
     }
 
     private IEnumerator KnockbackCoroutine(Vector2 force, float duration)
@@ -29,5 +45,7 @@ public class PlayerEffects : MonoBehaviour
         yield return new WaitForSeconds(duration);
 
         IsKnockback = false;
+
+        knockbackCoroutine = null;
     }
 }

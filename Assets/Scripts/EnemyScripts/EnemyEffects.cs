@@ -1,7 +1,8 @@
 using System.Collections;
 using UnityEngine;
+using Unity.Netcode;
 
-public class EnemyEffects : MonoBehaviour
+public class EnemyEffects : NetworkBehaviour
 {
     private Rigidbody2D rb;
 
@@ -15,6 +16,9 @@ public class EnemyEffects : MonoBehaviour
 
     public void ApplyKnockback(Vector2 force, float duration)
     {
+        if (!IsServer)
+            return;
+
         StopCoroutine(nameof(KnockbackCoroutine));
         StartCoroutine(KnockbackCoroutine(force, duration));
     }

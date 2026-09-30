@@ -2,28 +2,29 @@ using UnityEngine;
 
 public class CameraFollow : MonoBehaviour
 {
-    [Header("Target")]
-    [SerializeField] private Transform player;
+    // referencia para o alvo que a câmera seguirá
+    [SerializeField] private Transform target;
 
-    [Header("Follow")]
+    // espaçamento entre a câmera e o alvo
+    [SerializeField] private Vector3 offset = new Vector3(0f, 1f, -10f);
     [SerializeField] private float smoothSpeed = 5f;
 
-    [Header("Offset")]
-    [SerializeField] private Vector3 offset = new Vector3(0f, 1f, -10f);
+    public void SetTarget(Transform newTarget)
+    {
+        target = newTarget;
+    }
 
     private void LateUpdate()
     {
-        if (player == null)
+        if (target == null)
             return;
 
-        Vector3 targetPosition =
-            player.position + offset;
+        Vector3 targetPosition = target.position + offset;
 
-        transform.position =
-            Vector3.Lerp(
-                transform.position,
-                targetPosition,
-                smoothSpeed * Time.deltaTime
-            );
+        transform.position = Vector3.Lerp(
+            transform.position,
+            targetPosition,
+            smoothSpeed * Time.deltaTime
+        );
     }
 }

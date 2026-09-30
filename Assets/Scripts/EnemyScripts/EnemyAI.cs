@@ -1,6 +1,7 @@
 using UnityEngine;
+using Unity.Netcode;
 
-public class EnemyAI : MonoBehaviour
+public class EnemyAI : NetworkBehaviour
 {
     private EnemyEffects effects;
 
@@ -34,12 +35,32 @@ public class EnemyAI : MonoBehaviour
     void Start()
     {
         rb = GetComponent<Rigidbody2D>();
-        attackPointOriginalX = Mathf.Abs(attackPoint.localPosition.x);
         effects = GetComponent<EnemyEffects>();
+
+        if (spriteRenderer == null)
+        {
+            spriteRenderer = GetComponent<SpriteRenderer>();
+        }
+
+        if (attackPoint != null)
+        {
+            attackPointOriginalX = Mathf.Abs(attackPoint.localPosition.x);
+        }
     }
+
+    public override void OnNetworkSpawn()
+    {
+        if (!IsServer)
+            return;
+
+        patrolTimer = patrolTime;
+    }   
 
     void FixedUpdate()
     {
+        if (!IsServer)
+            return;
+
         DetectPlayer();
 
         if (player == null)
@@ -109,19 +130,43 @@ public class EnemyAI : MonoBehaviour
 
     private void DetectPlayer()
     {
-        Collider2D playerDetected = Physics2D.OverlapCircle(
+        Collider2D[] playersDetected = Physics2D.OverlapCircleAll(
             transform.position,
             detectionRange,
             playerLayer
         );
 
-        if (playerDetected != null)
-        {
-            player = playerDetected.transform;
-        }
-        else
+        if (playersDetected.Length == 0)
         {
             player = null;
+            return;
+        }
+
+        Collider2D closestPlayer = null;
+
+        float closestDistance = Mathf.Infinity;
+
+
+        foreach (Collider2D playerCollider in playersDetected)
+        {
+            float distance = Vector2.Distance(
+                    transform.position,
+                    playerCollider.transform.position
+                );
+
+
+            if (distance < closestDistance)
+            {
+                closestDistance = distance;
+
+                closestPlayer = playerCollider;
+            }
+        }
+
+
+        if (closestPlayer != null)
+        {
+            player = closestPlayer.transform;
         }
     }
 

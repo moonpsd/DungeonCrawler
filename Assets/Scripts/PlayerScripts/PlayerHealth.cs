@@ -1,32 +1,92 @@
 using UnityEngine;
-using UnityEngine.InputSystem;
 using UnityEngine.UI;
+using Unity.Netcode;
 
-public class PlayerHealth : MonoBehaviour
+public class PlayerHealth : NetworkBehaviour
 {
+    // Variáveis de vida
     [SerializeField] private float maxHealth = 100f;
-    [SerializeField] private Slider healthSlider;
 
-    private float currentHealth;
+    private NetworkVariable<float> currentHealth =
+        new NetworkVariable<float>(
+            100f,
+            NetworkVariableReadPermission.Everyone,
+            NetworkVariableWritePermission.Server
+        );
 
-    void Start()
+    private Slider healthSlider;
+
+    public override void OnNetworkSpawn()
     {
-        currentHealth = maxHealth;
+        // O servidor controla o valor real da vida
+        if (IsServer)
+        {
+            currentHealth.Value = maxHealth;
+        }
+
+        currentHealth.OnValueChanged += OnHealthChanged;
+
+        if (IsOwner)
+        {
+            FindHealthSlider();
+            UpdateHealthBar();
+        }
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        currentHealth.OnValueChanged -= OnHealthChanged;
+    }
+
+    private void FindHealthSlider()
+    {
+        GameObject sliderObject = GameObject.FindGameObjectWithTag("HealthSlider");
+
+        if (sliderObject == null)
+        {
+            Debug.LogWarning(
+                "Não encontrei um objeto com a Tag HealthSlider."
+            );
+
+            return;
+        }
+
+        healthSlider = sliderObject.GetComponent<Slider>();
+
+        if (healthSlider == null)
+        {
+            Debug.LogWarning(
+                "O objeto HealthSlider não possui componente Slider."
+            );
+        }
+    }
+
+    private void OnHealthChanged(
+        float previousHealth,
+        float newHealth
+    )
+    {
+        if (IsOwner)
+        {
+            UpdateHealthBar();
+        }
     }
 
     public void TakeDamage(float damage)
     {
-        currentHealth -= damage;
+        if (!IsServer)
+            return;
 
-        if (currentHealth < 0)
+        currentHealth.Value -= damage;
+
+        if (currentHealth.Value < 0)
         {
-            currentHealth = 0;
+            currentHealth.Value = 0;
         }
 
-        Debug.Log("Health: " + currentHealth);
-        UpdateHealthBar();
+        Debug.Log("Player " + OwnerClientId + " Health: " + currentHealth.Value);
 
-        if (currentHealth <= 0)
+        if (currentHealth.Value <= 0)
         {
             Die();
         }
@@ -34,24 +94,30 @@ public class PlayerHealth : MonoBehaviour
 
     public void Heal(float amount)
     {
-        currentHealth += amount;
+        // Somente servidor altera vida
+        if (!IsServer)
+            return;
 
-        if (currentHealth > maxHealth)
+        currentHealth.Value += amount;
+
+        if (currentHealth.Value > maxHealth)
         {
-            currentHealth = maxHealth;
+            currentHealth.Value = maxHealth;
         }
 
-        Debug.Log("Health: " + currentHealth);
-        UpdateHealthBar();
+        Debug.Log("Player " + OwnerClientId + " Health: " + currentHealth.Value);
     }
 
     private void UpdateHealthBar()
     {
-        healthSlider.value = currentHealth / maxHealth;
+        if (healthSlider == null)
+            return;
+
+        healthSlider.value = currentHealth.Value / maxHealth;
     }
 
     private void Die()
     {
-        Debug.Log("Player died!");
+        Debug.Log("Player " + OwnerClientId + " died!");
     }
 }

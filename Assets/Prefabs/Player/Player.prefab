@@ -44,8 +44,10 @@ GameObject:
   - component: {fileID: 2595743785546815699}
   - component: {fileID: 3501084036048637098}
   - component: {fileID: 1301272640072329856}
+  - component: {fileID: -1692040734503132155}
   - component: {fileID: 6461871474048972637}
   - component: {fileID: 7524054888750698921}
+  - component: {fileID: -139876257844878350}
   m_Layer: 7
   m_Name: Player
   m_TagString: Untagged
@@ -222,6 +224,33 @@ MonoBehaviour:
   enemyLayer:
     serializedVersion: 2
     m_Bits: 64
+--- !u!114 &-1692040734503132155
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2098767383653395572}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
+  GlobalObjectIdHash: 2532073780
+  InScenePlacedSourceGlobalObjectIdHash: 0
+  m_InScenePlacedDisabledByDefault: 0
+  DeferredDespawnTick: 0
+  Ownership: 1
+  AlwaysReplicateAsRoot: 0
+  SynchronizeTransform: 1
+  m_InScenePlaced: 0
+  ActiveSceneSynchronization: 0
+  SceneMigrationSynchronization: 1
+  SpawnWithObservers: 1
+  DontDestroyWithOwner: 0
+  AutoObjectParentSync: 1
+  SyncOwnerTransformWhenParented: 1
+  AllowOwnerToParent: 0
 --- !u!114 &6461871474048972637
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -234,8 +263,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e00380388ebe59747ac38bac695152ca, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerHealth
+  ShowTopMostFoldoutHeaderGroup: 1
   maxHealth: 100
-  healthSlider: {fileID: 0}
 --- !u!114 &7524054888750698921
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -248,6 +277,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8ba444fcfeae8a342be7db43680063dd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerMovement
+  ShowTopMostFoldoutHeaderGroup: 1
   speed: 5
   jumpForce: 5
   groundCheck: {fileID: 4861266711959459781}
@@ -257,6 +287,18 @@ MonoBehaviour:
     m_Bits: 8
   spriteRenderer: {fileID: 5870195117966703757}
   attackPoint: {fileID: 8622991028501383266}
+--- !u!114 &-139876257844878350
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2098767383653395572}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7fb6cfc005aa65f49accd6d3a826ce8d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerEffects
 --- !u!1 &6891252855480983360
 GameObject:
   m_ObjectHideFlags: 0

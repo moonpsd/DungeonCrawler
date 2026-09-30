@@ -1,7 +1,8 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using Unity.Netcode;
 
-public class PlayerMovement : MonoBehaviour
+public class PlayerMovement : NetworkBehaviour
 {
     private PlayerEffects effects;
 
@@ -22,7 +23,6 @@ public class PlayerMovement : MonoBehaviour
     private float direction;
     private Rigidbody2D rb;
     private bool isGrounded;
-
     private float attackPointOriginalX;
 
     void Start()
@@ -30,10 +30,44 @@ public class PlayerMovement : MonoBehaviour
         rb = GetComponent<Rigidbody2D>();
 
         effects = GetComponent<PlayerEffects>();
+
+        if (attackPoint != null)
+        {
+            attackPointOriginalX = Mathf.Abs(attackPoint.localPosition.x);
+        }
+
+    }
+
+    public override void OnNetworkSpawn()
+    {
+        if (!IsOwner)
+            return;
+
+        Camera mainCamera = Camera.main;
+
+        if (mainCamera == null)
+        {
+            Debug.LogWarning("Main Camera não encontrada!");
+            return;
+        }
+
+        CameraFollow cameraFollow = mainCamera.GetComponent<CameraFollow>();
+
+        if (cameraFollow == null)
+        {
+            Debug.LogWarning("CameraFollow não encontrado na Main Camera!");
+
+            return;
+        }
+
+        cameraFollow.SetTarget(transform);
     }
 
     void Update()
     {
+        if (!IsOwner)
+            return;
+
         isGrounded = Physics2D.OverlapCircle(
             groundCheck.position,
             groundCheckRadius,

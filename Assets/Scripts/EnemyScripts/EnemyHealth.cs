@@ -1,28 +1,51 @@
 using UnityEngine;
+using Unity.Netcode;
 
-public class EnemyHealth : MonoBehaviour
+public class EnemyHealth : NetworkBehaviour
 {
     [SerializeField] private float maxHealth = 100f;
 
-    private float currentHealth;
+    private NetworkVariable<float> currentHealth = new NetworkVariable<float>(
+            100f,
+            NetworkVariableReadPermission.Everyone,
+            NetworkVariableWritePermission.Server
+        );
 
-    void Start()
+    public override void OnNetworkSpawn()
     {
-        currentHealth = maxHealth;
+        if (IsServer)
+        {
+            currentHealth.Value = maxHealth;
+        }
+
+        currentHealth.OnValueChanged += OnHealthChanged;
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        currentHealth.OnValueChanged -= OnHealthChanged;
+    }
+
+    private void OnHealthChanged(float previousHealth, float newHealth)
+    {
+        Debug.Log("Enemy Health mudou: " + previousHealth + " -> " + newHealth);
     }
 
     public void TakeDamage(float damage)
     {
-        currentHealth -= damage;
+        if (!IsServer)
+            return;
 
-        if (currentHealth < 0)
+        currentHealth.Value -= damage;
+
+        if (currentHealth.Value < 0)
         {
-            currentHealth = 0;
+            currentHealth.Value = 0;
         }
 
-        Debug.Log("Health: " + currentHealth);
+        Debug.Log("Health: " + currentHealth.Value);
 
-        if (currentHealth <= 0)
+        if (currentHealth.Value <= 0)
         {
             Die();
         }
@@ -30,20 +53,40 @@ public class EnemyHealth : MonoBehaviour
 
     public void Heal(float amount)
     {
-        currentHealth += amount;
+        if (!IsServer)
+            return;
 
-        if (currentHealth > maxHealth)
+        currentHealth.Value += amount;
+
+        if (currentHealth.Value > maxHealth)
         {
-            currentHealth = maxHealth;
+            currentHealth.Value = maxHealth;
         }
 
-        Debug.Log("Health: " + currentHealth);
+        Debug.Log("Health: " + currentHealth.Value);
     }
 
     private void Die()
     {
+        if (!IsServer)
+            return;
+
         Debug.Log("Enemy died!");
 
-        Destroy(gameObject);
+        if (NetworkObject != null && NetworkObject.IsSpawned)
+        {
+            NetworkObject.Despawn(true);
+        }
+    }
+
+    public float GetCurrentHealth()
+    {
+        return currentHealth.Value;
+    }
+
+
+    public float GetMaxHealth()
+    {
+        return maxHealth;
     }
 }
